@@ -1,5 +1,7 @@
 package packlit
 
+import "fmt"
+
 // StreamDescriptor represents a single stream descriptor in JSON.
 // It closely maps to a descriptor built by WithInput/WithStream/WithOutput and other options.
 type StreamDescriptor struct {
@@ -143,4 +145,536 @@ type PlayReadyFlags struct {
 	EnableEncryption  bool   `json:"enable_playready_encryption,omitempty"`
 	ServerUrl         string `json:"playready_server_url,omitempty"`
 	ProgramIdentifier string `json:"program_identifier,omitempty"`
+}
+
+// FlagProcessor interface for processing different flag types
+type FlagProcessor interface {
+	ProcessFlags() ([]ShakaFlagFn, error)
+}
+
+var _ FlagProcessor = (*PackagerFlagsProcessor)(nil)
+
+// PackagerFlagsProcessor processes packager flags
+type PackagerFlagsProcessor struct {
+	flags *PackagerFlags
+}
+
+func NewPackagerFlagsProcessor(flags *PackagerFlags) *PackagerFlagsProcessor {
+	return &PackagerFlagsProcessor{flags: flags}
+}
+
+func (p *PackagerFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if p.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if p.flags.Licenses {
+		flagFns = append(flagFns, WithLicensesFlag())
+	}
+	if p.flags.Quiet {
+		flagFns = append(flagFns, WithQuietFlag())
+	}
+	if p.flags.UseFakeClockForMuxer {
+		flagFns = append(flagFns, WithUseFakeClockForMuxerFlag())
+	}
+	if p.flags.TestPackagerVersion {
+		flagFns = append(flagFns, WithTestPackagerVersionFlag())
+	}
+	if p.flags.SingleThreaded {
+		flagFns = append(flagFns, WithSingleThreadedFlag())
+	}
+	if p.flags.VModule != "" {
+		flagFns = append(flagFns, WithVModuleFlag(p.flags.VModule))
+	}
+	if p.flags.Version {
+		flagFns = append(flagFns, WithVersionFlag())
+	}
+
+	return flagFns, nil
+}
+
+// MuxerFlagsProcessor processes muxer flags
+type MuxerFlagsProcessor struct {
+	flags *MuxerFlags
+}
+
+var _ FlagProcessor = (*MuxerFlagsProcessor)(nil)
+
+func NewMuxerFlagsProcessor(flags *MuxerFlags) *MuxerFlagsProcessor {
+	return &MuxerFlagsProcessor{flags: flags}
+}
+
+func (m *MuxerFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if m.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if m.flags.ClearLead != 0 {
+		flagFns = append(flagFns, WithClearLeadFlag(m.flags.ClearLead))
+	}
+	if m.flags.SegmentDuration != 0 {
+		flagFns = append(flagFns, WithSegmentDurationFlag(m.flags.SegmentDuration))
+	}
+	if m.flags.SegmentSapAligned {
+		flagFns = append(flagFns, WithSegmentSapAlignedFlag())
+	}
+	if m.flags.FragmentDuration != 0 {
+		flagFns = append(flagFns, WithFragmentDurationFlag(m.flags.FragmentDuration))
+	}
+	if m.flags.FragmentSapAligned {
+		flagFns = append(flagFns, WithFragmentSapAlignedFlag())
+	}
+	if m.flags.GenerateSidxInMediaSegments {
+		flagFns = append(flagFns, WithGenerateSidxInMediaSegmentsFlag())
+	}
+	if m.flags.TempDir != "" {
+		flagFns = append(flagFns, WithTempDirFlag(m.flags.TempDir))
+	}
+	if m.flags.Mp4IncludePsshInStream {
+		flagFns = append(flagFns, WithMp4IncludePsshInStreamFlag())
+	}
+	if m.flags.TransportStreamTimestampOffsetMs != 0 {
+		flagFns = append(flagFns, WithTransportStreamTimestampOffsetMsFlag(m.flags.TransportStreamTimestampOffsetMs))
+	}
+	if m.flags.DefaultTextZeroBiasMs != 0 {
+		flagFns = append(flagFns, WithDefaultTextZeroBiasMsFlag(m.flags.DefaultTextZeroBiasMs))
+	}
+	if m.flags.StartSegmentNumber != 0 {
+		flagFns = append(flagFns, WithStartSegmentNumberFlag(m.flags.StartSegmentNumber))
+	}
+	if m.flags.UseDoviSupplementalCodecs {
+		flagFns = append(flagFns, WithUseDoviSupplementalCodecsFlag())
+	}
+
+	return flagFns, nil
+}
+
+// MPDFlagsProcessor processes MPD flags
+type MPDFlagsProcessor struct {
+	flags *MpdFlags
+}
+
+var _ FlagProcessor = (*MPDFlagsProcessor)(nil)
+
+func NewMPDFlagsProcessor(flags *MpdFlags) *MPDFlagsProcessor {
+	return &MPDFlagsProcessor{flags: flags}
+}
+
+func (m *MPDFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if m.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if m.flags.OutputMediaInfo {
+		flagFns = append(flagFns, WithOutputMediaInfoFlag())
+	}
+	if m.flags.MpdOutput != "" {
+		flagFns = append(flagFns, WithMpdOutput(m.flags.MpdOutput))
+	}
+	if len(m.flags.BaseUrls) > 0 {
+		flagFns = append(flagFns, WithBaseUrls(m.flags.BaseUrls))
+	}
+	if m.flags.GenerateStaticLiveMpd {
+		flagFns = append(flagFns, WithStaticLiveMpd())
+	}
+	if m.flags.AllowApproximateSegmentTimeline {
+		flagFns = append(flagFns, WithAllowApproximateSegmentTimelineFlag())
+	}
+	if m.flags.DumpStreamInfo {
+		flagFns = append(flagFns, WithDumpStream())
+	}
+	if m.flags.MinBufferTime != 0 {
+		if m.flags.MinBufferTime < 0 {
+			return nil, fmt.Errorf("min_buffer_time cannot be negative: %f", m.flags.MinBufferTime)
+		}
+		flagFns = append(flagFns, WithMinBufferTimeFlag(m.flags.MinBufferTime))
+	}
+	if m.flags.MinimumUpdatePeriod != 0 {
+		if m.flags.MinimumUpdatePeriod < 0 {
+			return nil, fmt.Errorf("minimum_update_period cannot be negative: %f", m.flags.MinimumUpdatePeriod)
+		}
+		flagFns = append(flagFns, WithMinimumUpdatePeriodFlag(m.flags.MinimumUpdatePeriod))
+	}
+	if m.flags.SuggestedPresentationDelay != 0 {
+		if m.flags.SuggestedPresentationDelay < 0 {
+			return nil, fmt.Errorf("suggested_presentation_delay cannot be negative: %f", m.flags.SuggestedPresentationDelay)
+		}
+		flagFns = append(flagFns, WithSuggestedPresentationDelayFlag(m.flags.SuggestedPresentationDelay))
+	}
+	if len(m.flags.UtcTimings) > 0 {
+		flagFns = append(flagFns, WithUtCTimingsFlag(m.flags.UtcTimings))
+	}
+	if m.flags.GenerateDashIfIopCompliantMpd {
+		flagFns = append(flagFns, WithGenerateDashIfIopCompliantMpdFlag())
+	}
+	if m.flags.AllowCodecSwitching {
+		flagFns = append(flagFns, WithAllowCodecSwitchingFlag())
+	}
+	if m.flags.IncludeMsprProForPlayReady {
+		flagFns = append(flagFns, WithIncludeMsprProForPlayReadyFlag())
+	}
+	if m.flags.DashForceSegmentList {
+		flagFns = append(flagFns, WithDashForceSegmentListFlag())
+	}
+	if m.flags.LowLatencyDashMode {
+		flagFns = append(flagFns, WithLowLatencyDashModeFlag(true))
+	}
+
+	return flagFns, nil
+}
+
+// ManifestFlagsProcessor processes manifest flags
+type ManifestFlagsProcessor struct {
+	flags *ManifestFlags
+}
+
+var _ FlagProcessor = (*ManifestFlagsProcessor)(nil)
+
+func NewManifestFlagsProcessor(flags *ManifestFlags) *ManifestFlagsProcessor {
+	return &ManifestFlagsProcessor{flags: flags}
+}
+
+func (m *ManifestFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if m.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if m.flags.TimeShiftBufferDepth != 0 {
+		if m.flags.TimeShiftBufferDepth < 0 {
+			return nil, fmt.Errorf("time_shift_buffer_depth cannot be negative: %f", m.flags.TimeShiftBufferDepth)
+		}
+		flagFns = append(flagFns, WithTimeShiftBufferDepthFlag(m.flags.TimeShiftBufferDepth))
+	}
+	if m.flags.PreservedSegmentsOutsideLiveWindow != 0 {
+		if m.flags.PreservedSegmentsOutsideLiveWindow < 0 {
+			return nil, fmt.Errorf("preserved_segments_outside_live_window cannot be negative: %d", m.flags.PreservedSegmentsOutsideLiveWindow)
+		}
+		flagFns = append(flagFns, WithPreservedSegmentsOutsideLiveWindowFlag(m.flags.PreservedSegmentsOutsideLiveWindow))
+	}
+	if m.flags.DefaultLanguage != "" {
+		flagFns = append(flagFns, WithDefaultLanguageFlag(m.flags.DefaultLanguage))
+	}
+	if m.flags.DefaultTextLanguage != "" {
+		flagFns = append(flagFns, WithDefaultTextLanguageFlag(m.flags.DefaultTextLanguage))
+	}
+	if m.flags.ForceClIndex {
+		flagFns = append(flagFns, WithForceCLIndexFlag())
+	}
+
+	return flagFns, nil
+}
+
+// HTTPFlagsProcessor processes HTTP flags
+type HTTPFlagsProcessor struct {
+	flags *HttpFlags
+}
+
+var _ FlagProcessor = (*HTTPFlagsProcessor)(nil)
+
+func NewHTTPFlagsProcessor(flags *HttpFlags) *HTTPFlagsProcessor {
+	return &HTTPFlagsProcessor{flags: flags}
+}
+
+func (h *HTTPFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if h.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if h.flags.UserAgent != "" {
+		flagFns = append(flagFns, WithUserAgentFlag(h.flags.UserAgent))
+	}
+	if h.flags.CaFile != "" {
+		flagFns = append(flagFns, WithCaFileFlag(h.flags.CaFile))
+	}
+	if h.flags.ClientCertFile != "" {
+		flagFns = append(flagFns, WithClientCertFileFlag(h.flags.ClientCertFile))
+	}
+	if h.flags.ClientCertPrivateKeyFile != "" {
+		flagFns = append(flagFns, WithClientCertPrivateKeyFileFlag(h.flags.ClientCertPrivateKeyFile))
+	}
+	if h.flags.ClientCertPrivateKeyPassword != "" {
+		flagFns = append(flagFns, WithClientCertPrivateKeyPasswordFlag(h.flags.ClientCertPrivateKeyPassword))
+	}
+	if h.flags.DisablePeerVerification {
+		flagFns = append(flagFns, WithDisablePeerVerificationFlag())
+	}
+	if h.flags.IgnoreHttpOutputFailures {
+		flagFns = append(flagFns, WithIgnoreHttpOutputFailuresFlag())
+	}
+	if h.flags.IoCacheSize != 0 {
+		flagFns = append(flagFns, WithIoCacheSizeFlag(h.flags.IoCacheSize))
+	}
+
+	return flagFns, nil
+}
+
+// HLSFlagsProcessor processes HLS flags
+type HLSFlagsProcessor struct {
+	flags *HlsFlags
+}
+
+var _ FlagProcessor = (*HLSFlagsProcessor)(nil)
+
+func NewHLSFlagsProcessor(flags *HlsFlags) *HLSFlagsProcessor {
+	return &HLSFlagsProcessor{flags: flags}
+}
+
+func (h *HLSFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if h.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if h.flags.MasterPlaylistOutput != "" {
+		flagFns = append(flagFns, WithHLSMasterPlaylistOutputFlag(h.flags.MasterPlaylistOutput))
+	}
+	if h.flags.BaseUrl != "" {
+		flagFns = append(flagFns, WithHLSBaseURLFlag(h.flags.BaseUrl))
+	}
+	if h.flags.KeyUri != "" {
+		flagFns = append(flagFns, WithHLSKeyURIFlag(h.flags.KeyUri))
+	}
+	if h.flags.PlaylistType != "" {
+		flagFns = append(flagFns, WithHLSPlaylistTypeFlag(h.flags.PlaylistType))
+	}
+	if h.flags.MediaSequenceNumber != 0 {
+		if h.flags.MediaSequenceNumber < 0 {
+			return nil, fmt.Errorf("hls_media_sequence_number cannot be negative: %d", h.flags.MediaSequenceNumber)
+		}
+		flagFns = append(flagFns, WithHLSMediaSequenceNumberFlag(h.flags.MediaSequenceNumber))
+	}
+	if h.flags.StartTimeOffset != 0 {
+		flagFns = append(flagFns, WithHLSStartTimeOffsetFlag(h.flags.StartTimeOffset))
+	}
+	if h.flags.CreateSessionKeys {
+		flagFns = append(flagFns, WithHLSCreateSessionKeysFlag())
+	}
+
+	return flagFns, nil
+}
+
+// CryptoFlagsProcessor processes crypto flags
+type CryptoFlagsProcessor struct {
+	flags *CryptoFlags
+}
+
+var _ FlagProcessor = (*CryptoFlagsProcessor)(nil)
+
+func NewCryptoFlagsProcessor(flags *CryptoFlags) *CryptoFlagsProcessor {
+	return &CryptoFlagsProcessor{flags: flags}
+}
+
+func (c *CryptoFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if c.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if c.flags.CryptByteBlock != 0 {
+		if c.flags.CryptByteBlock < 0 {
+			return nil, fmt.Errorf("crypt_byte_block cannot be negative: %d", c.flags.CryptByteBlock)
+		}
+		flagFns = append(flagFns, WithCryptByteBlockFlag(c.flags.CryptByteBlock))
+	}
+	if c.flags.ProtectionScheme != "" {
+		flagFns = append(flagFns, WithProtectionSchemeFlag(c.flags.ProtectionScheme))
+	}
+	if c.flags.SkipByteBlock != 0 {
+		if c.flags.SkipByteBlock < 0 {
+			return nil, fmt.Errorf("skip_byte_block cannot be negative: %d", c.flags.SkipByteBlock)
+		}
+		flagFns = append(flagFns, WithSkipByteBlockFlag(c.flags.SkipByteBlock))
+	}
+	if c.flags.Vp9SubsampleEncryption {
+		flagFns = append(flagFns, WithVP9SubsampleEncryptionFlag())
+	}
+	if c.flags.PlayreadyExtraHeaderData != "" {
+		flagFns = append(flagFns, WithPlayReadyExtraHeaderDataFlag(c.flags.PlayreadyExtraHeaderData))
+	}
+
+	return flagFns, nil
+}
+
+// ProtectionFlagsProcessor processes protection flags
+type ProtectionFlagsProcessor struct {
+	flags *ProtectionFlags
+}
+
+var _ FlagProcessor = (*ProtectionFlagsProcessor)(nil)
+
+func NewProtectionFlagsProcessor(flags *ProtectionFlags) *ProtectionFlagsProcessor {
+	return &ProtectionFlagsProcessor{flags: flags}
+}
+
+func (p *ProtectionFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if p.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if len(p.flags.ProtectionSystems) > 0 {
+		flagFns = append(flagFns, WithProtectionSystemsFlag(p.flags.ProtectionSystems))
+	}
+
+	return flagFns, nil
+}
+
+// RawKeyFlagsProcessor processes raw key flags
+type RawKeyFlagsProcessor struct {
+	flags *RawKeyFlags
+}
+
+var _ FlagProcessor = (*RawKeyFlagsProcessor)(nil)
+
+func NewRawKeyFlagsProcessor(flags *RawKeyFlags) *RawKeyFlagsProcessor {
+	return &RawKeyFlagsProcessor{flags: flags}
+}
+
+func (r *RawKeyFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if r.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if r.flags.EnableEncryption {
+		flagFns = append(flagFns, WithEnableRawKeyEncryptionFlag())
+	}
+	if r.flags.EnableDecryption {
+		flagFns = append(flagFns, WithEnableRawKeyDecryptionFlag())
+	}
+	if len(r.flags.Keys) > 0 {
+		flagFns = append(flagFns, WithKeysFlag(r.flags.Keys))
+	}
+	if r.flags.Iv != "" {
+		flagFns = append(flagFns, WithIvFlag(r.flags.Iv))
+	}
+	if r.flags.Pssh != "" {
+		flagFns = append(flagFns, WithPsshFlag(r.flags.Pssh))
+	}
+
+	return flagFns, nil
+}
+
+// WideVineFlagsProcessor processes Widevine flags
+type WideVineFlagsProcessor struct {
+	flags *WideVineFlags
+}
+
+var _ FlagProcessor = (*WideVineFlagsProcessor)(nil)
+
+func NewWideVineFlagsProcessor(flags *WideVineFlags) *WideVineFlagsProcessor {
+	return &WideVineFlagsProcessor{flags: flags}
+}
+
+func (w *WideVineFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if w.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if w.flags.EnableEncryption {
+		flagFns = append(flagFns, WithEnableWidevineEncryptionFlag())
+	}
+	if w.flags.EnableDecryption {
+		flagFns = append(flagFns, WithEnableWidevineDecryptionFlag())
+	}
+	if w.flags.KeyServerUrl != "" {
+		flagFns = append(flagFns, WithKeyServerURLFlag(w.flags.KeyServerUrl))
+	}
+	if w.flags.ContentId != "" {
+		flagFns = append(flagFns, WithContentIDFlag(w.flags.ContentId))
+	}
+	if w.flags.Policy != "" {
+		flagFns = append(flagFns, WithPolicyFlag(w.flags.Policy))
+	}
+	if w.flags.MaxSdPixels != 0 {
+		if w.flags.MaxSdPixels < 0 {
+			return nil, fmt.Errorf("max_sd_pixels cannot be negative: %d", w.flags.MaxSdPixels)
+		}
+		flagFns = append(flagFns, WithMaxSDPixelsFlag(w.flags.MaxSdPixels))
+	}
+	if w.flags.MaxHdPixels != 0 {
+		if w.flags.MaxHdPixels < 0 {
+			return nil, fmt.Errorf("max_hd_pixels cannot be negative: %d", w.flags.MaxHdPixels)
+		}
+		flagFns = append(flagFns, WithMaxHDPixelsFlag(w.flags.MaxHdPixels))
+	}
+	if w.flags.MaxUhd1Pixels != 0 {
+		if w.flags.MaxUhd1Pixels < 0 {
+			return nil, fmt.Errorf("max_uhd1_pixels cannot be negative: %d", w.flags.MaxUhd1Pixels)
+		}
+		flagFns = append(flagFns, WithMaxUHD1PixelsFlag(w.flags.MaxUhd1Pixels))
+	}
+	if w.flags.Signer != "" {
+		flagFns = append(flagFns, WithSignerFlag(w.flags.Signer))
+	}
+	if w.flags.AesSigningKey != "" {
+		flagFns = append(flagFns, WithAESSigningKeyFlag(w.flags.AesSigningKey))
+	}
+	if w.flags.AesSigningIv != "" {
+		flagFns = append(flagFns, WithAESSigningIVFlag(w.flags.AesSigningIv))
+	}
+	if w.flags.RsaSigningKeyPath != "" {
+		flagFns = append(flagFns, WithRSASigningKeyPathFlag(w.flags.RsaSigningKeyPath))
+	}
+	if w.flags.CryptoPeriodDuration != 0 {
+		if w.flags.CryptoPeriodDuration < 0 {
+			return nil, fmt.Errorf("crypto_period_duration cannot be negative: %d", w.flags.CryptoPeriodDuration)
+		}
+		flagFns = append(flagFns, WithCryptoPeriodDurationFlag(w.flags.CryptoPeriodDuration))
+	}
+	if w.flags.GroupId != "" {
+		flagFns = append(flagFns, WithGroupIDFlag(w.flags.GroupId))
+	}
+	if w.flags.EnableEntitlement {
+		flagFns = append(flagFns, WithEnableEntitlementLicenseFlag())
+	}
+
+	return flagFns, nil
+}
+
+// PlayReadyFlagsProcessor processes PlayReady flags
+type PlayReadyFlagsProcessor struct {
+	flags *PlayReadyFlags
+}
+
+var _ FlagProcessor = (*PlayReadyFlagsProcessor)(nil)
+
+func NewPlayReadyFlagsProcessor(flags *PlayReadyFlags) *PlayReadyFlagsProcessor {
+	return &PlayReadyFlagsProcessor{flags: flags}
+}
+
+func (p *PlayReadyFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+	if p.flags == nil {
+		return nil, nil
+	}
+
+	var flagFns []ShakaFlagFn
+
+	if p.flags.EnableEncryption {
+		flagFns = append(flagFns, WithPlayReadyEncryptionFlag())
+	}
+	if p.flags.ServerUrl != "" {
+		flagFns = append(flagFns, WithPlayReadyServerURLFlag(p.flags.ServerUrl))
+	}
+	if p.flags.ProgramIdentifier != "" {
+		flagFns = append(flagFns, WithProgramIdentifierFlag(p.flags.ProgramIdentifier))
+	}
+
+	return flagFns, nil
 }
