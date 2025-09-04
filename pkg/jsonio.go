@@ -724,6 +724,38 @@ func (pb *PackagerJsonBuilder) Build() (*ShakaPackager, error) {
 		builder.WithFlag(NewFlags(allFlags...))
 	}
 
+	// Build streams
+	for _, s := range pb.options.Streams {
+		streamBuilder := NewStreamBuilder()
+		if s.Input != "" {
+			streamBuilder = streamBuilder.WithInput(s.Input)
+		}
+		if s.Stream != "" {
+			streamBuilder = streamBuilder.WithStream(StreamType(s.Stream))
+		}
+		if s.Output != "" {
+			streamBuilder = streamBuilder.WithOutput(s.Output)
+		}
+		if s.InitSegment != "" {
+			streamBuilder = streamBuilder.AddOption(WithInitSegment(s.InitSegment))
+		}
+		if s.SegmentTemplate != "" {
+			streamBuilder = streamBuilder.AddOption(WithSegmentTemplate(s.SegmentTemplate))
+		}
+		// Extra arbitrary key=value pairs for stream descriptors
+		if len(s.Extra) > 0 {
+			for k, v := range s.Extra {
+				key := k
+				val := v
+				streamBuilder = streamBuilder.AddOption(func(so *StreamOptions) {
+					so.Add(GenericKeyValueOption{Key: key, Value: val})
+				})
+			}
+		}
+
+		builder.WithStream(streamBuilder.Build())
+	}
+
 	return builder.Build(), nil
 }
 
