@@ -11,8 +11,8 @@ var (
 	_ ShakaParser = (*ContentIDFlag)(nil)
 	_ ShakaParser = (*PolicyFlag)(nil)
 	_ ShakaParser = (*MaxSDPixelslag)(nil)
-	_ ShakaParser = (*MaxHDPixelslag)(nil)
-	_ ShakaParser = (*MaxUHD1Pixelslag)(nil)
+	_ ShakaParser = (*MaxHDPixelsFlag)(nil)
+	_ ShakaParser = (*MaxUHD1PixelsFlag)(nil)
 	_ ShakaParser = (*SignerFlag)(nil)
 	_ ShakaParser = (*AESSigningKeyFlag)(nil)
 	_ ShakaParser = (*AESSigningIVFlag)(nil)
@@ -105,29 +105,29 @@ func (m MaxSDPixelslag) Validate() error {
 	return nil
 }
 
-// MaxHDPixelslag represents the flag for the maximum pixels for HD video.
-type MaxHDPixelslag int
+// MaxHDPixelsFlag represents the flag for the maximum pixels for HD video.
+type MaxHDPixelsFlag int
 
 // Parse returns the string representation of MaxHDPixels for use in the command line flags.
-func (m MaxHDPixelslag) Parse() string {
+func (m MaxHDPixelsFlag) Parse() string {
 	return fmt.Sprintf("--max_hd_pixels=%d", m)
 }
 
-// Validate checks if the MaxHDPixelslag value is valid.
-func (m MaxHDPixelslag) Validate() error {
+// Validate checks if the MaxHDPixelsFlag value is valid.
+func (m MaxHDPixelsFlag) Validate() error {
 	return nil
 }
 
-// MaxUHD1Pixelslag represents the flag for the maximum pixels for UHD1 video.
-type MaxUHD1Pixelslag int
+// MaxUHD1PixelsFlag represents the flag for the maximum pixels for UHD1 video.
+type MaxUHD1PixelsFlag int
 
 // Parse returns the string representation of MaxUHD1Pixels for use in the command line flags.
-func (m MaxUHD1Pixelslag) Parse() string {
+func (m MaxUHD1PixelsFlag) Parse() string {
 	return fmt.Sprintf("--max_uhd1_pixels=%d", m)
 }
 
-// Validate checks if the MaxUHD1Pixelslag value is valid.
-func (m MaxUHD1Pixelslag) Validate() error {
+// Validate checks if the MaxUHD1PixelsFlag value is valid.
+func (m MaxUHD1PixelsFlag) Validate() error {
 	return nil
 }
 

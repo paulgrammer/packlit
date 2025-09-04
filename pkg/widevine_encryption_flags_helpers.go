@@ -45,14 +45,14 @@ func WithMaxSDPixelsFlag(value int) ShakaFlagFn {
 // WithMaxHDPixelsFlag Adds flag '--max_hd_pixels=<value>'
 func WithMaxHDPixelsFlag(value int) ShakaFlagFn {
 	return func(so *ShakaFlags) {
-		so.Add(MaxHDPixelslag(value))
+		so.Add(MaxHDPixelsFlag(value))
 	}
 }
 
 // WithMaxUHD1PixelsFlag Adds flag '--max_uhd1_pixels=<value>'
 func WithMaxUHD1PixelsFlag(value int) ShakaFlagFn {
 	return func(so *ShakaFlags) {
-		so.Add(MaxUHD1Pixelslag(value))
+		so.Add(MaxUHD1PixelsFlag(value))
 	}
 }
 
