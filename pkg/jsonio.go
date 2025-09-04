@@ -1,6 +1,9 @@
 package packlit
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // StreamDescriptor represents a single stream descriptor in JSON.
 // It closely maps to a descriptor built by WithInput/WithStream/WithOutput and other options.
@@ -677,4 +680,65 @@ func (p *PlayReadyFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 	}
 
 	return flagFns, nil
+}
+
+// PackagerJsonBuilder orchestrates the building process
+type PackagerJsonBuilder struct {
+	options *PackagerOptions
+}
+
+func NewPackagerJsonBuilder(options *PackagerOptions) *PackagerJsonBuilder {
+	return &PackagerJsonBuilder{options: options}
+}
+
+// Build builds a ShakaPackager from PackagerOptions with comprehensive error handling
+func (pb *PackagerJsonBuilder) Build() (*ShakaPackager, error) {
+	builder := NewBuilder(pb.options.Binary)
+
+	// Process all flag types using processors
+	processors := []FlagProcessor{
+		NewPackagerFlagsProcessor(pb.options.Packager),
+		NewMuxerFlagsProcessor(pb.options.Muxer),
+		NewMPDFlagsProcessor(pb.options.MPD),
+		NewManifestFlagsProcessor(pb.options.Manifest),
+		NewHTTPFlagsProcessor(pb.options.HTTP),
+		NewHLSFlagsProcessor(pb.options.HLS),
+		NewCryptoFlagsProcessor(pb.options.Crypto),
+		NewProtectionFlagsProcessor(pb.options.Protection),
+		NewRawKeyFlagsProcessor(pb.options.RawKey),
+		NewWideVineFlagsProcessor(pb.options.Widevine),
+		NewPlayReadyFlagsProcessor(pb.options.Playready),
+	}
+
+	var allFlags []ShakaFlagFn
+	for i, processor := range processors {
+		flags, err := processor.ProcessFlags()
+		if err != nil {
+			return nil, fmt.Errorf("processor %d flag processing failed: %w", i, err)
+		}
+
+		allFlags = append(allFlags, flags...)
+	}
+
+	if len(allFlags) > 0 {
+		builder.WithFlag(NewFlags(allFlags...))
+	}
+
+	return builder.Build(), nil
+}
+
+// UnmarshalFlagsFromJSON is a helper to decode JSON payloads.
+func UnmarshalFlagsFromJSON(data []byte) (PackagerOptions, error) {
+	var req PackagerOptions
+	if err := json.Unmarshal(data, &req); err != nil {
+		return PackagerOptions{}, err
+	}
+
+	return req, nil
+}
+
+// BuildFromJSON is the main entry point with improved error handling
+func BuildShakaPackagerFromJSON(req PackagerOptions) (*ShakaPackager, error) {
+	builder := NewPackagerJsonBuilder(&req)
+	return builder.Build()
 }
