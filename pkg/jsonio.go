@@ -26,11 +26,7 @@ type PackagerOptions struct {
 	Manifest   *ManifestFlags     `json:"manifest,omitempty"`
 	HTTP       *HttpFlags         `json:"http,omitempty"`
 	HLS        *HlsFlags          `json:"hls,omitempty"`
-	Crypto     *CryptoFlags       `json:"crypto,omitempty"`
-	Protection *ProtectionFlags   `json:"protection,omitempty"`
-	RawKey     *RawKeyFlags       `json:"raw_key,omitempty"`
-	Widevine   *WideVineFlags     `json:"widevine,omitempty"`
-	Playready  *PlayReadyFlags    `json:"playready,omitempty"`
+	Encryption *EncryptionFlags   `json:"encryption,omitempty"`
 }
 
 // Flag configuration structs
@@ -60,21 +56,21 @@ type MuxerFlags struct {
 }
 
 type MpdFlags struct {
-	OutputMediaInfo                 bool     `json:"output_media_info,omitempty"`
-	MpdOutput                       string   `json:"mpd_output,omitempty"`
-	BaseUrls                        []string `json:"base_urls,omitempty"`
-	GenerateStaticLiveMpd           bool     `json:"generate_static_live_mpd,omitempty"`
-	AllowApproximateSegmentTimeline bool     `json:"allow_approximate_segment_timeline,omitempty"`
-	DumpStreamInfo                  bool     `json:"dump_stream_info,omitempty"`
-	MinBufferTime                   float32  `json:"min_buffer_time,omitempty"`
-	MinimumUpdatePeriod             float32  `json:"minimum_update_period,omitempty"`
-	SuggestedPresentationDelay      float32  `json:"suggested_presentation_delay,omitempty"`
-	UtcTimings                      []string `json:"utc_timings,omitempty"`
-	GenerateDashIfIopCompliantMpd   bool     `json:"generate_dash_if_iop_compliant_mpd,omitempty"`
-	AllowCodecSwitching             bool     `json:"allow_codec_switching,omitempty"`
-	IncludeMsprProForPlayReady      bool     `json:"include_mspr_pro_for_playready,omitempty"`
-	DashForceSegmentList            bool     `json:"dash_force_segment_list,omitempty"`
-	LowLatencyDashMode              bool     `json:"low_latency_dash_mode,omitempty"`
+	OutputMediaInfo                 bool              `json:"output_media_info,omitempty"`
+	MpdOutput                       string            `json:"mpd_output,omitempty"`
+	BaseUrls                        []string          `json:"base_urls,omitempty"`
+	GenerateStaticLiveMpd           bool              `json:"generate_static_live_mpd,omitempty"`
+	AllowApproximateSegmentTimeline bool              `json:"allow_approximate_segment_timeline,omitempty"`
+	DumpStreamInfo                  bool              `json:"dump_stream_info,omitempty"`
+	MinBufferTime                   float32           `json:"min_buffer_time,omitempty"`
+	MinimumUpdatePeriod             float32           `json:"minimum_update_period,omitempty"`
+	SuggestedPresentationDelay      float32           `json:"suggested_presentation_delay,omitempty"`
+	UtcTimings                      map[string]string `json:"utc_timings,omitempty"`
+	GenerateDashIfIopCompliantMpd   bool              `json:"generate_dash_if_iop_compliant_mpd,omitempty"`
+	AllowCodecSwitching             bool              `json:"allow_codec_switching,omitempty"`
+	IncludeMsprProForPlayReady      bool              `json:"include_mspr_pro_for_playready,omitempty"`
+	DashForceSegmentList            bool              `json:"dash_force_segment_list,omitempty"`
+	LowLatencyDashMode              bool              `json:"low_latency_dash_mode,omitempty"`
 }
 
 type ManifestFlags struct {
@@ -106,24 +102,34 @@ type HlsFlags struct {
 	CreateSessionKeys    bool    `json:"create_session_keys,omitempty"`
 }
 
-type CryptoFlags struct {
-	CryptByteBlock           int    `json:"crypt_byte_block,omitempty"`
-	ProtectionScheme         string `json:"protection_scheme,omitempty"`
-	SkipByteBlock            int    `json:"skip_byte_block,omitempty"`
-	Vp9SubsampleEncryption   bool   `json:"vp9_subsample_encryption,omitempty"`
-	PlayreadyExtraHeaderData string `json:"playready_extra_header_data,omitempty"`
+type EncryptionFlags struct {
+	CryptByteBlock           int             `json:"crypt_byte_block,omitempty"`
+	ProtectionScheme         string          `json:"protection_scheme,omitempty"`
+	ProtectionSystems        []string        `json:"protection_systems,omitempty"`
+	SkipByteBlock            int             `json:"skip_byte_block,omitempty"`
+	Vp9SubsampleEncryption   bool            `json:"vp9_subsample_encryption,omitempty"`
+	PlayreadyExtraHeaderData string          `json:"playready_extra_header_data,omitempty"`
+	RawKey                   *RawKeyFlags    `json:"raw_key,omitempty"`
+	Widevine                 *WideVineFlags  `json:"widevine,omitempty"`
+	Playready                *PlayReadyFlags `json:"playready,omitempty"`
 }
 
-type ProtectionFlags struct {
-	ProtectionSystems []string `json:"protection_systems,omitempty"`
+type RawKeyInfo struct {
+	Label string `json:"label"`
+	KeyId string `json:"key_id"`
+	Key   string `json:"key"`
+}
+
+func (r *RawKeyInfo) String() string {
+	return fmt.Sprintf("label=%s:key_id=%s:key=%s", r.Label, r.KeyId, r.Key)
 }
 
 type RawKeyFlags struct {
-	EnableEncryption bool     `json:"enable_raw_key_encryption,omitempty"`
-	EnableDecryption bool     `json:"enable_raw_key_decryption,omitempty"`
-	Keys             []string `json:"keys,omitempty"`
-	Iv               string   `json:"iv,omitempty"`
-	Pssh             string   `json:"pssh,omitempty"`
+	EnableEncryption bool         `json:"enable_raw_key_encryption,omitempty"`
+	EnableDecryption bool         `json:"enable_raw_key_decryption,omitempty"`
+	Keys             []RawKeyInfo `json:"keys,omitempty"`
+	Iv               string       `json:"iv,omitempty"`
+	Pssh             string       `json:"pssh,omitempty"`
 }
 
 type WideVineFlags struct {
@@ -293,25 +299,24 @@ func (m *MPDFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 		flagFns = append(flagFns, WithDumpStream())
 	}
 	if m.flags.MinBufferTime != 0 {
-		if m.flags.MinBufferTime < 0 {
-			return nil, fmt.Errorf("min_buffer_time cannot be negative: %f", m.flags.MinBufferTime)
-		}
 		flagFns = append(flagFns, WithMinBufferTimeFlag(m.flags.MinBufferTime))
 	}
 	if m.flags.MinimumUpdatePeriod != 0 {
-		if m.flags.MinimumUpdatePeriod < 0 {
-			return nil, fmt.Errorf("minimum_update_period cannot be negative: %f", m.flags.MinimumUpdatePeriod)
-		}
 		flagFns = append(flagFns, WithMinimumUpdatePeriodFlag(m.flags.MinimumUpdatePeriod))
 	}
 	if m.flags.SuggestedPresentationDelay != 0 {
-		if m.flags.SuggestedPresentationDelay < 0 {
-			return nil, fmt.Errorf("suggested_presentation_delay cannot be negative: %f", m.flags.SuggestedPresentationDelay)
-		}
 		flagFns = append(flagFns, WithSuggestedPresentationDelayFlag(m.flags.SuggestedPresentationDelay))
 	}
 	if len(m.flags.UtcTimings) > 0 {
-		flagFns = append(flagFns, WithUtCTimingsFlag(m.flags.UtcTimings))
+		// Convert map to comma-separated scheme_id_uri=value pairs
+		timingPairs := make([]string, 0, len(m.flags.UtcTimings))
+		for schemeIdUri, value := range m.flags.UtcTimings {
+			if schemeIdUri == "" {
+				return nil, fmt.Errorf("empty scheme_id_uri found in utc_timings")
+			}
+			timingPairs = append(timingPairs, fmt.Sprintf("%s=%s", schemeIdUri, value))
+		}
+		flagFns = append(flagFns, WithUtCTimingsFlag(timingPairs))
 	}
 	if m.flags.GenerateDashIfIopCompliantMpd {
 		flagFns = append(flagFns, WithGenerateDashIfIopCompliantMpdFlag())
@@ -351,15 +356,9 @@ func (m *ManifestFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 	var flagFns []ShakaFlagFn
 
 	if m.flags.TimeShiftBufferDepth != 0 {
-		if m.flags.TimeShiftBufferDepth < 0 {
-			return nil, fmt.Errorf("time_shift_buffer_depth cannot be negative: %f", m.flags.TimeShiftBufferDepth)
-		}
 		flagFns = append(flagFns, WithTimeShiftBufferDepthFlag(m.flags.TimeShiftBufferDepth))
 	}
 	if m.flags.PreservedSegmentsOutsideLiveWindow != 0 {
-		if m.flags.PreservedSegmentsOutsideLiveWindow < 0 {
-			return nil, fmt.Errorf("preserved_segments_outside_live_window cannot be negative: %d", m.flags.PreservedSegmentsOutsideLiveWindow)
-		}
 		flagFns = append(flagFns, WithPreservedSegmentsOutsideLiveWindowFlag(m.flags.PreservedSegmentsOutsideLiveWindow))
 	}
 	if m.flags.DefaultLanguage != "" {
@@ -452,9 +451,6 @@ func (h *HLSFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 		flagFns = append(flagFns, WithHLSPlaylistTypeFlag(h.flags.PlaylistType))
 	}
 	if h.flags.MediaSequenceNumber != 0 {
-		if h.flags.MediaSequenceNumber < 0 {
-			return nil, fmt.Errorf("hls_media_sequence_number cannot be negative: %d", h.flags.MediaSequenceNumber)
-		}
 		flagFns = append(flagFns, WithHLSMediaSequenceNumberFlag(h.flags.MediaSequenceNumber))
 	}
 	if h.flags.StartTimeOffset != 0 {
@@ -467,18 +463,18 @@ func (h *HLSFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 	return flagFns, nil
 }
 
-// CryptoFlagsProcessor processes crypto flags
-type CryptoFlagsProcessor struct {
-	flags *CryptoFlags
+// EncryptionFlagsProcessor processes crypto flags
+type EncryptionFlagsProcessor struct {
+	flags *EncryptionFlags
 }
 
-var _ FlagProcessor = (*CryptoFlagsProcessor)(nil)
+var _ FlagProcessor = (*EncryptionFlagsProcessor)(nil)
 
-func NewCryptoFlagsProcessor(flags *CryptoFlags) *CryptoFlagsProcessor {
-	return &CryptoFlagsProcessor{flags: flags}
+func NewEncryptionFlagsProcessor(flags *EncryptionFlags) *EncryptionFlagsProcessor {
+	return &EncryptionFlagsProcessor{flags: flags}
 }
 
-func (c *CryptoFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
+func (c *EncryptionFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 	if c.flags == nil {
 		return nil, nil
 	}
@@ -486,18 +482,15 @@ func (c *CryptoFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 	var flagFns []ShakaFlagFn
 
 	if c.flags.CryptByteBlock != 0 {
-		if c.flags.CryptByteBlock < 0 {
-			return nil, fmt.Errorf("crypt_byte_block cannot be negative: %d", c.flags.CryptByteBlock)
-		}
 		flagFns = append(flagFns, WithCryptByteBlockFlag(c.flags.CryptByteBlock))
 	}
 	if c.flags.ProtectionScheme != "" {
 		flagFns = append(flagFns, WithProtectionSchemeFlag(c.flags.ProtectionScheme))
 	}
+	if len(c.flags.ProtectionSystems) > 0 {
+		flagFns = append(flagFns, WithProtectionSystemsFlag(c.flags.ProtectionSystems))
+	}
 	if c.flags.SkipByteBlock != 0 {
-		if c.flags.SkipByteBlock < 0 {
-			return nil, fmt.Errorf("skip_byte_block cannot be negative: %d", c.flags.SkipByteBlock)
-		}
 		flagFns = append(flagFns, WithSkipByteBlockFlag(c.flags.SkipByteBlock))
 	}
 	if c.flags.Vp9SubsampleEncryption {
@@ -505,31 +498,6 @@ func (c *CryptoFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 	}
 	if c.flags.PlayreadyExtraHeaderData != "" {
 		flagFns = append(flagFns, WithPlayReadyExtraHeaderDataFlag(c.flags.PlayreadyExtraHeaderData))
-	}
-
-	return flagFns, nil
-}
-
-// ProtectionFlagsProcessor processes protection flags
-type ProtectionFlagsProcessor struct {
-	flags *ProtectionFlags
-}
-
-var _ FlagProcessor = (*ProtectionFlagsProcessor)(nil)
-
-func NewProtectionFlagsProcessor(flags *ProtectionFlags) *ProtectionFlagsProcessor {
-	return &ProtectionFlagsProcessor{flags: flags}
-}
-
-func (p *ProtectionFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
-	if p.flags == nil {
-		return nil, nil
-	}
-
-	var flagFns []ShakaFlagFn
-
-	if len(p.flags.ProtectionSystems) > 0 {
-		flagFns = append(flagFns, WithProtectionSystemsFlag(p.flags.ProtectionSystems))
 	}
 
 	return flagFns, nil
@@ -560,7 +528,12 @@ func (r *RawKeyFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 		flagFns = append(flagFns, WithEnableRawKeyDecryptionFlag())
 	}
 	if len(r.flags.Keys) > 0 {
-		flagFns = append(flagFns, WithKeysFlag(r.flags.Keys))
+		// Validate and convert key info structs to formatted strings
+		keyStrings := make([]string, 0, len(r.flags.Keys))
+		for _, keyInfo := range r.flags.Keys {
+			keyStrings = append(keyStrings, keyInfo.String())
+		}
+		flagFns = append(flagFns, WithKeysFlag(keyStrings))
 	}
 	if r.flags.Iv != "" {
 		flagFns = append(flagFns, WithIvFlag(r.flags.Iv))
@@ -606,21 +579,12 @@ func (w *WideVineFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 		flagFns = append(flagFns, WithPolicyFlag(w.flags.Policy))
 	}
 	if w.flags.MaxSdPixels != 0 {
-		if w.flags.MaxSdPixels < 0 {
-			return nil, fmt.Errorf("max_sd_pixels cannot be negative: %d", w.flags.MaxSdPixels)
-		}
 		flagFns = append(flagFns, WithMaxSDPixelsFlag(w.flags.MaxSdPixels))
 	}
 	if w.flags.MaxHdPixels != 0 {
-		if w.flags.MaxHdPixels < 0 {
-			return nil, fmt.Errorf("max_hd_pixels cannot be negative: %d", w.flags.MaxHdPixels)
-		}
 		flagFns = append(flagFns, WithMaxHDPixelsFlag(w.flags.MaxHdPixels))
 	}
 	if w.flags.MaxUhd1Pixels != 0 {
-		if w.flags.MaxUhd1Pixels < 0 {
-			return nil, fmt.Errorf("max_uhd1_pixels cannot be negative: %d", w.flags.MaxUhd1Pixels)
-		}
 		flagFns = append(flagFns, WithMaxUHD1PixelsFlag(w.flags.MaxUhd1Pixels))
 	}
 	if w.flags.Signer != "" {
@@ -636,9 +600,6 @@ func (w *WideVineFlagsProcessor) ProcessFlags() ([]ShakaFlagFn, error) {
 		flagFns = append(flagFns, WithRSASigningKeyPathFlag(w.flags.RsaSigningKeyPath))
 	}
 	if w.flags.CryptoPeriodDuration != 0 {
-		if w.flags.CryptoPeriodDuration < 0 {
-			return nil, fmt.Errorf("crypto_period_duration cannot be negative: %d", w.flags.CryptoPeriodDuration)
-		}
 		flagFns = append(flagFns, WithCryptoPeriodDurationFlag(w.flags.CryptoPeriodDuration))
 	}
 	if w.flags.GroupId != "" {
@@ -703,11 +664,14 @@ func (pb *PackagerJsonBuilder) Build() (*ShakaPackager, error) {
 		NewManifestFlagsProcessor(pb.options.Manifest),
 		NewHTTPFlagsProcessor(pb.options.HTTP),
 		NewHLSFlagsProcessor(pb.options.HLS),
-		NewCryptoFlagsProcessor(pb.options.Crypto),
-		NewProtectionFlagsProcessor(pb.options.Protection),
-		NewRawKeyFlagsProcessor(pb.options.RawKey),
-		NewWideVineFlagsProcessor(pb.options.Widevine),
-		NewPlayReadyFlagsProcessor(pb.options.Playready),
+		NewEncryptionFlagsProcessor(pb.options.Encryption),
+	}
+
+	// Add encryption-related processors if encryption options are provided
+	if pb.options.Encryption != nil {
+		processors = append(processors, NewRawKeyFlagsProcessor(pb.options.Encryption.RawKey))
+		processors = append(processors, NewWideVineFlagsProcessor(pb.options.Encryption.Widevine))
+		processors = append(processors, NewPlayReadyFlagsProcessor(pb.options.Encryption.Playready))
 	}
 
 	var allFlags []ShakaFlagFn
@@ -770,7 +734,7 @@ func UnmarshalFlagsFromJSON(data []byte) (PackagerOptions, error) {
 }
 
 // BuildFromJSON is the main entry point with improved error handling
-func BuildShakaPackagerFromJSON(req PackagerOptions) (*ShakaPackager, error) {
+func BuildFromJSON(req PackagerOptions) (*ShakaPackager, error) {
 	builder := NewPackagerJsonBuilder(&req)
 	return builder.Build()
 }

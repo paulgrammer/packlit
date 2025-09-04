@@ -38,7 +38,7 @@ func WithPolicyFlag(value string) ShakaFlagFn {
 // WithMaxSDPixelsFlag Adds flag '--max_sd_pixels=<value>'
 func WithMaxSDPixelsFlag(value int) ShakaFlagFn {
 	return func(so *ShakaFlags) {
-		so.Add(MaxSDPixelslag(value))
+		so.Add(MaxSDPixelsFlag(value))
 	}
 }
 
